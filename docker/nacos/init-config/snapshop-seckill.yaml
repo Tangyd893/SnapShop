@@ -1,0 +1,4 @@
+snapshop:
+  seckill:
+    token-ttl-seconds: 60
+    result-ttl-seconds: 86400

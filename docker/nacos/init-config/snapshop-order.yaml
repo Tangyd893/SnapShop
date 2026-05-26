@@ -1,0 +1,3 @@
+snapshop:
+  order:
+    timeout-minutes: 15

@@ -1,0 +1,3 @@
+snapshop:
+  jwt:
+    secret: SnapShopJwtSecretKey2024MustBeAtLeast32Bytes!

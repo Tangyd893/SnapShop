@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/snapshop?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: snapshop
+    password: ${MYSQL_PASSWORD:snapshop123}
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: snapshop
+    password: ${RABBITMQ_PASSWORD:snapshop123}
+
+snapshop:
+  rabbitmq:
+    consumer:
+      max-retries: 5
+  message:
+    compensate:
+      interval-seconds: 30
+      max-retries: 10
+  seckill:
+    token-ttl-seconds: 60
+    result-ttl-seconds: 86400
+  jwt:
+    access-token-ttl-seconds: 7200
+    refresh-token-ttl-seconds: 604800

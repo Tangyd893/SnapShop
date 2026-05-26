@@ -1,0 +1,4 @@
+snapshop:
+  product:
+    cache:
+      ttl-seconds: 3600
