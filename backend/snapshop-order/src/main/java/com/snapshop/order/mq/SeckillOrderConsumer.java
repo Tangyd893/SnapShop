@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import com.snapshop.common.base.BizException;
 import com.snapshop.common.base.ErrorCode;
+import com.snapshop.common.base.R;
 import com.snapshop.order.config.RabbitConfig;
 import com.snapshop.order.dto.CreateOrderDTO;
 import com.snapshop.order.dto.InventoryDeductDTO;

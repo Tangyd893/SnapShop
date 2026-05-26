@@ -1,0 +1,18 @@
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: snapshop
+    password: snapshop123
+    publisher-confirm-type: correlated
+  datasource:
+    url: jdbc:mysql://localhost:3306/snapshop?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: snapshop
+    password: snapshop123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.snapshop.payment.entity
+  configuration:
+    map-underscore-to-camel-case: true

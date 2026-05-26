@@ -2,6 +2,7 @@ package com.snapshop.order.feign;
 
 import com.snapshop.common.base.R;
 import com.snapshop.order.dto.InventoryDeductDTO;
+import com.snapshop.order.dto.InventoryRecoverDTO;
 import com.snapshop.order.dto.InventoryResponseDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,4 +22,13 @@ public interface InventoryFeignClient {
      */
     @PostMapping("/deduct")
     R<InventoryResponseDTO> deductStock(@RequestBody InventoryDeductDTO dto);
+
+    /**
+     * 回补库存
+     *
+     * @param dto 库存回补请求
+     * @return 库存回补结果
+     */
+    @PostMapping("/recover")
+    R<InventoryResponseDTO> recover(@RequestBody InventoryRecoverDTO dto);
 }
