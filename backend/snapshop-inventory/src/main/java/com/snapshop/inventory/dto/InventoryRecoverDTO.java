@@ -20,6 +20,9 @@ public class InventoryRecoverDTO {
     /** 回补数量 */
     private Integer quantity;
 
+    /** 秒杀活动编号（用于 Redis 库存回补，非秒杀场景可为 null） */
+    private Long activityId;
+
     /** 回补原因 */
     private String reason;
 }

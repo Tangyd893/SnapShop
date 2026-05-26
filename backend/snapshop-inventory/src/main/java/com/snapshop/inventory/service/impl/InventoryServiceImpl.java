@@ -13,6 +13,7 @@ import com.snapshop.inventory.mapper.SkuStockMapper;
 import com.snapshop.inventory.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,10 @@ public class InventoryServiceImpl implements InventoryService {
 
     private final SkuStockMapper skuStockMapper;
     private final InventoryLogMapper inventoryLogMapper;
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    /** Redis 秒杀库存键前缀 */
+    private static final String REDIS_STOCK_KEY_PREFIX = "seckill:stock:";
 
     /** 库存变更类型：扣减 */
     private static final String CHANGE_TYPE_DEDUCT = "DEDUCT";
@@ -111,6 +116,19 @@ public class InventoryServiceImpl implements InventoryService {
         // 写入库存流水
         saveInventoryLog(dto.getBusinessKey(), dto.getSkuId(), CHANGE_TYPE_RECOVER,
                 dto.getQuantity(), beforeStock, afterStock, dto.getReason());
+
+        // 回补 Redis 秒杀库存（如果传入了 activityId）
+        if (dto.getActivityId() != null) {
+            String redisKey = REDIS_STOCK_KEY_PREFIX + dto.getActivityId() + ":" + dto.getSkuId();
+            try {
+                Long redisStock = redisTemplate.opsForValue().increment(redisKey, dto.getQuantity());
+                log.info("Redis 库存回补成功: key={}, 回补数量={}, 回补后库存={}",
+                        redisKey, dto.getQuantity(), redisStock);
+            } catch (Exception e) {
+                log.error("Redis 库存回补失败（MySQL 已回补成功，需人工补偿）: key={}, quantity={}, skuId={}",
+                        redisKey, dto.getQuantity(), dto.getSkuId(), e);
+            }
+        }
 
         log.info("库存回补成功: skuId={}, before={}, after={}, quantity={}",
                 dto.getSkuId(), beforeStock, afterStock, dto.getQuantity());
