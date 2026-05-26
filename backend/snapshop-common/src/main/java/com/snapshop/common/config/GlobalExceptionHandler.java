@@ -26,8 +26,9 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.OK)
     public R<Void> handleBizException(BizException e, HttpServletRequest request) {
         log.warn("业务异常 [{}] {}: {}", e.getCode(), request.getRequestURI(), e.getMessage());
-        return R.fail(e.getCode(), e.getMessage())
-                .requestId(getRequestId(request));
+        R<Void> r = R.<Void>fail(e.getCode(), e.getMessage());
+        r.setRequestId(getRequestId(request));
+        return r;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -36,8 +37,9 @@ public class GlobalExceptionHandler {
         String msg = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining("; "));
-        return R.fail(ErrorCode.BAD_REQUEST.getCode(), msg)
-                .requestId(getRequestId(request));
+        R<Void> r = R.<Void>fail(ErrorCode.BAD_REQUEST.getCode(), msg);
+        r.setRequestId(getRequestId(request));
+        return r;
     }
 
     @ExceptionHandler(BindException.class)
@@ -46,16 +48,18 @@ public class GlobalExceptionHandler {
         String msg = e.getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining("; "));
-        return R.fail(ErrorCode.BAD_REQUEST.getCode(), msg)
-                .requestId(getRequestId(request));
+        R<Void> r = R.<Void>fail(ErrorCode.BAD_REQUEST.getCode(), msg);
+        r.setRequestId(getRequestId(request));
+        return r;
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.OK)
     public R<Void> handleException(Exception e, HttpServletRequest request) {
         log.error("系统异常 [{}] {}", request.getRequestURI(), e.getMessage(), e);
-        return R.fail(ErrorCode.INTERNAL_ERROR.getCode(), "系统繁忙，请稍后重试")
-                .requestId(getRequestId(request));
+        R<Void> r = R.<Void>fail(ErrorCode.INTERNAL_ERROR.getCode(), "系统繁忙，请稍后重试");
+        r.setRequestId(getRequestId(request));
+        return r;
     }
 
     private String getRequestId(HttpServletRequest request) {
