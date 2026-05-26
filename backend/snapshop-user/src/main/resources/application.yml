@@ -1,28 +1,13 @@
 spring:
-  redis:
-    host: localhost
-    port: 6379
   datasource:
     url: jdbc:mysql://localhost:3306/snapshop?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: snapshop
     password: snapshop123
     driver-class-name: com.mysql.cj.jdbc.Driver
-  rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
-    listener:
-      simple:
-        acknowledge-mode: manual
-        retry:
-          enabled: true
-          max-attempts: 3
-          initial-interval: 2000ms
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
-  type-aliases-package: com.snapshop.order.entity
+  type-aliases-package: com.snapshop.user.entity
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

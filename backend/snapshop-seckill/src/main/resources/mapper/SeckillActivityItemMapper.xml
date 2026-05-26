@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.snapshop.seckill.mapper.SeckillActivityItemMapper">
+
+    <!-- 通用结果映射：关联 product 和 sku 表 -->
+    <resultMap id="SeckillItemVOMap" type="com.snapshop.seckill.vo.SeckillItemVO">
+        <result property="skuId" column="sku_id"/>
+        <result property="title" column="title"/>
+        <result property="coverUrl" column="cover_url"/>
+        <result property="originPrice" column="origin_price"/>
+        <result property="seckillPrice" column="seckill_price"/>
+        <result property="limitPerUser" column="limit_per_user"/>
+    </resultMap>
+
+    <!-- 查询活动商品列表，关联 product 和 sku 表 -->
+    <select id="selectItemsWithProduct" resultMap="SeckillItemVOMap">
+        SELECT
+            sai.sku_id,
+            p.title,
+            p.cover_url,
+            s.price AS origin_price,
+            sai.seckill_price,
+            sai.limit_per_user
+        FROM seckill_activity_item sai
+            LEFT JOIN sku s ON sai.sku_id = s.id
+            LEFT JOIN product p ON s.product_id = p.id
+        WHERE sai.activity_id = #{activityId}
+    </select>
+
+    <!-- 查询单个活动商品详情，关联 product 和 sku 表 -->
+    <select id="selectItemWithProduct" resultMap="SeckillItemVOMap">
+        SELECT
+            sai.sku_id,
+            p.title,
+            p.cover_url,
+            s.price AS origin_price,
+            sai.seckill_price,
+            sai.limit_per_user
+        FROM seckill_activity_item sai
+            LEFT JOIN sku s ON sai.sku_id = s.id
+            LEFT JOIN product p ON s.product_id = p.id
+        WHERE sai.activity_id = #{activityId}
+          AND sai.sku_id = #{skuId}
+    </select>
+
+</mapper>

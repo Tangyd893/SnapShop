@@ -2,27 +2,27 @@ spring:
   redis:
     host: localhost
     port: 6379
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: snapshop
+    password: snapshop123
+    publisher-confirm-type: correlated
+    publisher-returns: true
   datasource:
     url: jdbc:mysql://localhost:3306/snapshop?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: snapshop
     password: snapshop123
     driver-class-name: com.mysql.cj.jdbc.Driver
-  rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
-    listener:
-      simple:
-        acknowledge-mode: manual
-        retry:
-          enabled: true
-          max-attempts: 3
-          initial-interval: 2000ms
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
-  type-aliases-package: com.snapshop.order.entity
+  type-aliases-package: com.snapshop.seckill.entity
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 秒杀业务配置
+seckill:
+  token-ttl-seconds: 60
+  result-ttl-seconds: 86400
