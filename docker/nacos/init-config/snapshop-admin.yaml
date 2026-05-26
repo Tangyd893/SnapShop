@@ -1,0 +1,5 @@
+snapshop:
+  admin:
+    jwt:
+      secret: AdminJwtSecretKey2024DifferentFromcEnd!
+      access-token-ttl-seconds: 7200

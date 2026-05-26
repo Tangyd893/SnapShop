@@ -279,3 +279,18 @@ CREATE TABLE IF NOT EXISTS `mq_message_log` (
     KEY `idx_business_key` (`business_key`),
     KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消费端消息日志表';
+
+-- ----------------------------
+-- 管理后台管理员表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS `admin_user` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `username` VARCHAR(64) NOT NULL,
+    `password_hash` VARCHAR(128) NOT NULL,
+    `role` VARCHAR(32) NOT NULL DEFAULT 'OPERATOR',
+    `status` VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_admin_username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

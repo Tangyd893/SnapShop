@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'snapshop'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - gateway:8080
+          - seckill:8084
+          - order:8085
+          - inventory:8086
+          - payment:8087

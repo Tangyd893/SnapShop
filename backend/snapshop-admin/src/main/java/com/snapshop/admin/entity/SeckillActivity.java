@@ -1,0 +1,31 @@
+package com.snapshop.admin.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+
+/**
+ * 秒杀活动表实体（管理后台直连）
+ */
+@Data
+@TableName("seckill_activity")
+public class SeckillActivity {
+
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
+    private String activityName;
+
+    private LocalDateTime startTime;
+
+    private LocalDateTime endTime;
+
+    private String status;
+
+    private LocalDateTime createdAt;
+
+    private LocalDateTime updatedAt;
+}

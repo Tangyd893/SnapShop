@@ -21,6 +21,7 @@
         <module>snapshop-order</module>
         <module>snapshop-inventory</module>
         <module>snapshop-payment</module>
+        <module>snapshop-admin</module>
     </modules>
 
     <properties>

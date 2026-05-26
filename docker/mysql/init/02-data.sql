@@ -37,3 +37,7 @@ INSERT INTO `seckill_activity` (`id`, `activity_name`, `start_time`, `end_time`,
 INSERT INTO `seckill_activity_item` (`id`, `activity_id`, `sku_id`, `seckill_price`, `activity_stock`, `limit_per_user`, `status`) VALUES
 (1, 10001, 30001, 9900, 100, 1, 'NORMAL'),
 (2, 10001, 30003, 4900, 50, 1, 'NORMAL');
+
+-- 管理员账号（密码为 123456 的 BCrypt 哈希）
+INSERT INTO `admin_user` (`id`, `username`, `password_hash`, `role`, `status`) VALUES
+(1, 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'SUPER_ADMIN', 'ACTIVE');

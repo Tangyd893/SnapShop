@@ -15,6 +15,17 @@
     <description>统一响应模型、异常处理、错误码、工具类</description>
 
     <dependencies>
+        <!-- Logstash JSON 日志编码器 -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+        <!-- Micrometer Prometheus 指标暴露 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

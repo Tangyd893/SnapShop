@@ -1,0 +1,10 @@
+groups:
+  - name: snapshop
+    rules:
+      - alert: DeadLetterSpike
+        expr: rabbitmq_dead_letter_total > 50
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "死信消息激增"

@@ -27,3 +27,9 @@ snapshop:
   jwt:
     access-token-ttl-seconds: 7200
     refresh-token-ttl-seconds: 604800
+
+# 结构化 JSON 日志配置（通过 logback-spring.xml 自动加载）
+logging:
+  level:
+    com.snapshop: INFO
+    root: INFO

@@ -26,6 +26,10 @@ spring:
           uri: lb://snapshop-payment
           predicates:
             - Path=/api/payments/**
+        - id: admin
+          uri: lb://snapshop-admin
+          predicates:
+            - Path=/api/admin/**
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin
       globalcors:

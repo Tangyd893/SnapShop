@@ -84,3 +84,34 @@ services:
       timeout: 5s
       retries: 10
       start_period: 40s
+
+  # ==================== 可观测性监控栈（profile: monitoring） ====================
+  prometheus:
+    image: prom/prometheus
+    container_name: snapshop-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml
+    profiles: ["monitoring"]
+
+  grafana:
+    image: grafana/grafana
+    container_name: snapshop-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    profiles: ["monitoring"]
+
+  # ==================== 链路追踪（profile: tracing） ====================
+  jaeger:
+    image: jaegertracing/all-in-one
+    container_name: snapshop-jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    profiles: ["tracing"]

@@ -218,3 +218,66 @@ chmod +x seckill-api-test.sh
 4. 阅读 [开发启动指南](docs/开发启动指南.md)，按任务编号起工
 5. 阅读 [项目里程碑文档](docs/项目里程碑文档.md) 与 [开发任务拆解文档](docs/开发任务拆解文档.md)
 6. 实现阶段对照各专项设计文档进行开发
+
+## 部署说明
+
+### 本地开发完整启动步骤
+
+1. **环境准备**：确保已安装 JDK 21、Maven 3.8+、Node.js 20+、Docker & Docker Compose。
+
+2. **启动中间件**（MySQL、Redis、RabbitMQ、Nacos）：
+   ```bash
+   cd docker
+   docker-compose up -d
+   ```
+
+3. **初始化数据库**：
+   ```bash
+   mysql -h 127.0.0.1 -u root -p < docker/mysql/init.sql
+   ```
+
+4. **导入 Nacos 配置**：启动 Nacos 后，通过控制台 `http://localhost:8848/nacos` 导入 `docker/nacos/init-config/` 下的配置到 `snapshop-dev` 命名空间。
+
+5. **启动后端服务**（按依赖顺序）：
+   ```bash
+   cd backend
+   mvn clean install -DskipTests
+   # 以下在多个终端窗口分别启动
+   mvn -pl snapshop-gateway spring-boot:run
+   mvn -pl snapshop-auth spring-boot:run
+   mvn -pl snapshop-user spring-boot:run
+   mvn -pl snapshop-product spring-boot:run
+   mvn -pl snapshop-seckill spring-boot:run
+   mvn -pl snapshop-order spring-boot:run
+   mvn -pl snapshop-inventory spring-boot:run
+   mvn -pl snapshop-payment spring-boot:run
+   ```
+
+6. **启动前端**：
+   ```bash
+   cd frontend/snapshop-web
+   npm install
+   npm run dev
+   ```
+
+### Docker Compose Profiles 说明
+
+| Profile | 包含服务 | 启动命令 |
+| --- | --- | --- |
+| 默认（无 profile） | MySQL、Redis、RabbitMQ、Nacos | `docker-compose up -d` |
+| `monitoring` | Prometheus、Grafana | `docker-compose --profile monitoring up -d` |
+| `tracing` | Jaeger（链路追踪） | `docker-compose --profile tracing up -d` |
+
+同时启动所有服务：`docker-compose --profile monitoring --profile tracing up -d`
+
+### 监控栈地址
+
+| 组件 | 地址 | 说明 |
+| --- | --- | --- |
+| **Grafana** | http://localhost:3000 | 可视化仪表盘（默认账号 admin/admin） |
+| **Prometheus** | http://localhost:9090 | 指标采集与告警 |
+| **Jaeger** | http://localhost:16686 | 分布式链路追踪 UI |
+| **RabbitMQ 管理** | http://localhost:15672 | 消息队列管理界面 |
+| **Nacos 控制台** | http://localhost:8848/nacos | 服务注册与配置管理 |
+
+详细可观测性设计见 [可观测性与部署文档](docs/可观测性与部署文档.md)。
