@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.server.ServerResponse;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -26,7 +27,7 @@ public class SentinelFallbackHandler {
     /**
      * 处理限流降级响应
      */
-    public Mono<Void> handleFallback(ServerWebExchange exchange, String message) {
+    public Mono<ServerResponse> handleFallback(ServerWebExchange exchange, String message) {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
@@ -35,10 +36,11 @@ public class SentinelFallbackHandler {
         try {
             byte[] bytes = MAPPER.writeValueAsBytes(r);
             DataBuffer buffer = response.bufferFactory().wrap(bytes);
-            return response.writeWith(Mono.just(buffer));
+            return response.writeWith(Mono.just(buffer))
+                    .then(Mono.empty());
         } catch (Exception e) {
             log.error("序列化降级响应失败", e);
-            return response.setComplete();
+            return response.setComplete().then(Mono.empty());
         }
     }
 }
