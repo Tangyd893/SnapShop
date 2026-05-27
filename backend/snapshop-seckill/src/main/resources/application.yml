@@ -14,6 +14,29 @@ spring:
     username: snapshop
     password: snapshop123
     driver-class-name: com.mysql.cj.jdbc.Driver
+  cloud:
+    sentinel:
+      transport:
+        dashboard: localhost:8888
+        port: 8719
+      eager: true
+      datasource:
+        flow:
+          nacos:
+            server-addr: ${spring.cloud.nacos.server-addr}
+            namespace: ${spring.cloud.nacos.config.namespace}
+            dataId: sentinel-rules-snapshop-seckill-flow.yaml
+            groupId: SENTINEL_GROUP
+            rule-type: flow
+            data-type: json
+        degrade:
+          nacos:
+            server-addr: ${spring.cloud.nacos.server-addr}
+            namespace: ${spring.cloud.nacos.config.namespace}
+            dataId: sentinel-rules-snapshop-seckill-degrade.yaml
+            groupId: SENTINEL_GROUP
+            rule-type: degrade
+            data-type: json
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
