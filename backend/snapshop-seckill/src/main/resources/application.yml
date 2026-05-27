@@ -23,7 +23,7 @@ spring:
       datasource:
         flow:
           nacos:
-            server-addr: ${spring.cloud.nacos.server-addr}
+            server-addr: ${spring.cloud.nacos.config.server-addr}
             namespace: ${spring.cloud.nacos.config.namespace}
             dataId: sentinel-rules-snapshop-seckill-flow.yaml
             groupId: SENTINEL_GROUP
@@ -31,7 +31,7 @@ spring:
             data-type: json
         degrade:
           nacos:
-            server-addr: ${spring.cloud.nacos.server-addr}
+            server-addr: ${spring.cloud.nacos.config.server-addr}
             namespace: ${spring.cloud.nacos.config.namespace}
             dataId: sentinel-rules-snapshop-seckill-degrade.yaml
             groupId: SENTINEL_GROUP
