@@ -1,0 +1,20 @@
+[
+  {
+    "resource": "seckill_submit",
+    "limitApp": "default",
+    "grade": 1,
+    "count": 500,
+    "strategy": 0,
+    "controlBehavior": 0,
+    "burstCount": 0
+  },
+  {
+    "resource": "seckill_token",
+    "limitApp": "default",
+    "grade": 1,
+    "count": 100,
+    "strategy": 0,
+    "controlBehavior": 0,
+    "burstCount": 0
+  }
+]

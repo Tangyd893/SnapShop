@@ -1,0 +1,19 @@
+[
+  {
+    "resource": "seckill_redis_call",
+    "grade": 0,
+    "count": 200,
+    "slowRatioThreshold": 0.5,
+    "timeWindow": 10,
+    "minRequestAmount": 5,
+    "statIntervalMs": 1000
+  },
+  {
+    "resource": "seckill_db_call",
+    "grade": 1,
+    "count": 0.5,
+    "timeWindow": 10,
+    "minRequestAmount": 5,
+    "statIntervalMs": 1000
+  }
+]

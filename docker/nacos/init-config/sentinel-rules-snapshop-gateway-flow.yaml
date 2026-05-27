@@ -1,0 +1,29 @@
+[
+  {
+    "resource": "/api/seckill/**",
+    "limitApp": "default",
+    "grade": 1,
+    "count": 1000,
+    "strategy": 0,
+    "controlBehavior": 0,
+    "burstCount": 0
+  },
+  {
+    "resource": "/api/orders/**",
+    "limitApp": "default",
+    "grade": 1,
+    "count": 500,
+    "strategy": 0,
+    "controlBehavior": 0,
+    "burstCount": 0
+  },
+  {
+    "resource": "/api/products/**",
+    "limitApp": "default",
+    "grade": 1,
+    "count": 2000,
+    "strategy": 0,
+    "controlBehavior": 0,
+    "burstCount": 0
+  }
+]
