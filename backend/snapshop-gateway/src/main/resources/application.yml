@@ -1,0 +1,16 @@
+spring:
+  cloud:
+    sentinel:
+      transport:
+        dashboard: localhost:8888
+        port: 8719
+      eager: true
+      datasource:
+        flow:
+          nacos:
+            server-addr: ${spring.cloud.nacos.server-addr}
+            namespace: ${spring.cloud.nacos.config.namespace}
+            dataId: sentinel-rules-snapshop-gateway-flow.yaml
+            groupId: SENTINEL_GROUP
+            rule-type: flow
+            data-type: json
