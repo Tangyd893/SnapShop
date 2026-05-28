@@ -95,7 +95,8 @@ docker-compose up -d
 
 ```bash
 # 连接 MySQL 并执行初始化 SQL
-mysql -h 127.0.0.1 -u root -p < docker/mysql/init.sql
+mysql -h 127.0.0.1 -u root -p < docker/mysql/init/01-schema.sql
+mysql -h 127.0.0.1 -u root -p < docker/mysql/init/02-data.sql
 ```
 
 ### 4. 导入 Nacos 配置
@@ -201,6 +202,7 @@ chmod +x seckill-api-test.sh
 - [完整增强版范围说明](docs/完整增强版范围说明.md)
 - [工程配置说明](docs/工程配置说明.md)
 - [开发启动指南](docs/开发启动指南.md)
+- [项目进度追踪](docs/项目进度追踪.md)
 - [项目里程碑文档](docs/项目里程碑文档.md)
 - [开发任务拆解文档](docs/开发任务拆解文档.md)
 - [文档一致性检查清单](docs/文档一致性检查清单.md)
@@ -215,9 +217,10 @@ chmod +x seckill-api-test.sh
 1. 阅读 [完整增强版范围说明](docs/完整增强版范围说明.md)，确认交付边界
 2. 阅读 [工程配置说明](docs/工程配置说明.md)，锁定版本、端口与 Nacos 约定
 3. 执行 [文档一致性检查清单](docs/文档一致性检查清单.md) 自检
-4. 阅读 [开发启动指南](docs/开发启动指南.md)，按任务编号起工
-5. 阅读 [项目里程碑文档](docs/项目里程碑文档.md) 与 [开发任务拆解文档](docs/开发任务拆解文档.md)
-6. 实现阶段对照各专项设计文档进行开发
+4. 阅读 [项目进度追踪](docs/项目进度追踪.md)，确认当前阶段、已完成项和待验证项
+5. 阅读 [开发启动指南](docs/开发启动指南.md)，按任务编号起工
+6. 阅读 [项目里程碑文档](docs/项目里程碑文档.md) 与 [开发任务拆解文档](docs/开发任务拆解文档.md)
+7. 实现阶段对照各专项设计文档进行开发
 
 ## 部署说明
 
@@ -233,7 +236,8 @@ chmod +x seckill-api-test.sh
 
 3. **初始化数据库**：
    ```bash
-   mysql -h 127.0.0.1 -u root -p < docker/mysql/init.sql
+   mysql -h 127.0.0.1 -u root -p < docker/mysql/init/01-schema.sql
+   mysql -h 127.0.0.1 -u root -p < docker/mysql/init/02-data.sql
    ```
 
 4. **导入 Nacos 配置**：启动 Nacos 后，通过控制台 `http://localhost:8848/nacos` 导入 `docker/nacos/init-config/` 下的配置到 `snapshop-dev` 命名空间。

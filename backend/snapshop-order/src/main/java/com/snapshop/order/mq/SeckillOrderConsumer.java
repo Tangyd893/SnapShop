@@ -31,6 +31,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 秒杀订单 MQ 消费者
+ * <p>
+ * 注意：handleSeckillOrder 统一由 @Transactional 包裹整个处理流程。
+ * 不再通过自调用触发 processSeckillOrder，避免代理失效导致事务不生效。
  */
 @Slf4j
 @Component
@@ -52,131 +55,165 @@ public class SeckillOrderConsumer {
     private static final String STATUS_PROCESSING = "PROCESSING";
     /** 消费状态：成功 */
     private static final String STATUS_SUCCESS = "SUCCESS";
-    /** 消费状态：失败 */
-    private static final String STATUS_FAILED = "FAILED";
 
     /**
      * 监听秒杀订单队列，手动确认模式
+     * <p>
+     * 整个处理流程在一个数据库事务中完成：
+     * 消费日志写入 → 库存扣减 → 订单创建 → 结果写入 Redis → 消息确认。
+     * 任何步骤失败都会回滚事务并 nack 消息，由 RabbitMQ 重新投递。
      */
+    @Transactional(rollbackFor = Exception.class)
     @RabbitListener(queues = RabbitConfig.SECKILL_ORDER_QUEUE)
     public void handleSeckillOrder(SeckillOrderMessage seckillMessage, Message message, Channel channel,
-                                   @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) {
+                                   @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws Exception {
         String messageId = seckillMessage.getMessageId();
+        String requestId = seckillMessage.getRequestId();
+        Long userId = seckillMessage.getUserId();
+        Long activityId = seckillMessage.getActivityId();
+        Long skuId = seckillMessage.getSkuId();
+
         log.info("收到秒杀订单消息: messageId={}, requestId={}, userId={}, skuId={}, activityId={}",
-                messageId, seckillMessage.getRequestId(), seckillMessage.getUserId(),
-                seckillMessage.getSkuId(), seckillMessage.getActivityId());
+                messageId, requestId, userId, skuId, activityId);
 
         try {
             // 1. 幂等性检查：查询 mq_message_log 表
-            LambdaQueryWrapper<MqMessageLog> queryWrapper = new LambdaQueryWrapper<MqMessageLog>()
-                    .eq(MqMessageLog::getMessageId, messageId)
-                    .eq(MqMessageLog::getConsumerGroup, RabbitConfig.CONSUMER_GROUP);
-            MqMessageLog existingLog = mqMessageLogMapper.selectOne(queryWrapper);
+            MqMessageLog existingLog = mqMessageLogMapper.selectOne(
+                    new LambdaQueryWrapper<MqMessageLog>()
+                            .eq(MqMessageLog::getMessageId, messageId)
+                            .eq(MqMessageLog::getConsumerGroup, RabbitConfig.CONSUMER_GROUP));
 
             if (existingLog != null && STATUS_SUCCESS.equals(existingLog.getStatus())) {
                 log.info("消息已成功处理，直接确认: messageId={}", messageId);
-                // 已成功处理，直接确认消息
                 channel.basicAck(deliveryTag, false);
                 return;
             }
 
-            // 2. 插入 mq_message_log 记录（状态 = PROCESSING）
-            MqMessageLog messageLog = new MqMessageLog();
-            messageLog.setMessageId(messageId);
-            messageLog.setBusinessKey(seckillMessage.getBusinessKey());
-            messageLog.setConsumerGroup(RabbitConfig.CONSUMER_GROUP);
-            messageLog.setStatus(STATUS_PROCESSING);
-            messageLog.setRetryCount(0);
-            messageLog.setCreatedAt(LocalDateTime.now());
-            messageLog.setUpdatedAt(LocalDateTime.now());
-            mqMessageLogMapper.insert(messageLog);
+            // 2. 业务层幂等：检查 seckill_order 表（兜底：防止上一轮事务提交后 ack 丢失的场景）
+            if (checkSeckillOrderExists(userId, activityId, skuId)) {
+                log.info("秒杀订单已存在（业务幂等），直接确认: messageId={}, userId={}, activityId={}, skuId={}",
+                        messageId, userId, activityId, skuId);
+                // 确保结果缓存存在
+                writeSeckillResultSuccess(requestId, null, null);
+                channel.basicAck(deliveryTag, false);
+                return;
+            }
 
-            // 3. 执行业务逻辑（事务包裹）
-            processSeckillOrder(seckillMessage);
+            // 3. 写入消费日志（首次插入，重试更新）
+            MqMessageLog messageLog;
+            if (existingLog == null) {
+                messageLog = new MqMessageLog();
+                messageLog.setMessageId(messageId);
+                messageLog.setBusinessKey(seckillMessage.getBusinessKey());
+                messageLog.setConsumerGroup(RabbitConfig.CONSUMER_GROUP);
+                messageLog.setRetryCount(0);
+                messageLog.setCreatedAt(LocalDateTime.now());
+                messageLog.setStatus(STATUS_PROCESSING);
+                messageLog.setUpdatedAt(LocalDateTime.now());
+                mqMessageLogMapper.insert(messageLog);
+            } else {
+                messageLog = existingLog;
+                messageLog.setRetryCount((messageLog.getRetryCount() != null ? messageLog.getRetryCount() : 0) + 1);
+                messageLog.setStatus(STATUS_PROCESSING);
+                messageLog.setUpdatedAt(LocalDateTime.now());
+                mqMessageLogMapper.updateById(messageLog);
+            }
 
-            // 4. 更新 mq_message_log 状态 = SUCCESS
+            // 4. 调用库存服务扣减库存
+            InventoryDeductDTO deductDTO = new InventoryDeductDTO(skuId, seckillMessage.getQuantity(), requestId);
+            deductDTO.setBusinessKey(seckillMessage.getBusinessKey());
+            R<InventoryResponseDTO> deductResult = inventoryFeignClient.deductStock(deductDTO);
+
+            if (deductResult == null || deductResult.getCode() != 0 || deductResult.getData() == null
+                    || !Boolean.TRUE.equals(deductResult.getData().getSuccess())) {
+                throw new BizException(ErrorCode.STOCK_DEDUCT_FAILED, "库存扣减失败");
+            }
+
+            // 5. 创建订单
+            CreateOrderDTO createOrderDTO = new CreateOrderDTO();
+            createOrderDTO.setUserId(userId);
+            createOrderDTO.setSkuId(skuId);
+            createOrderDTO.setTitle("秒杀商品");
+            createOrderDTO.setPrice(seckillMessage.getSeckillPrice());
+            createOrderDTO.setQuantity(seckillMessage.getQuantity());
+            createOrderDTO.setActivityId(activityId);
+            createOrderDTO.setRequestId(requestId);
+            createOrderDTO.setOrderType("SECKILL");
+
+            Order order = orderService.createOrder(createOrderDTO);
+
+            // 6. 写入秒杀成功结果到 Redis
+            writeSeckillResultSuccess(requestId, order.getId(), order.getOrderNo());
+
+            // 7. 更新消费日志为成功
             messageLog.setStatus(STATUS_SUCCESS);
             messageLog.setUpdatedAt(LocalDateTime.now());
             mqMessageLogMapper.updateById(messageLog);
 
-            // 5. 手动确认消息
+            // 8. 手动确认消息
             channel.basicAck(deliveryTag, false);
-            log.info("秒杀订单处理成功: messageId={}, requestId={}", messageId, seckillMessage.getRequestId());
+            log.info("秒杀订单处理成功: messageId={}, requestId={}, orderId={}",
+                    messageId, requestId, order.getId());
 
-        } catch (Exception e) {
-            log.error("秒杀订单处理失败: messageId={}, requestId={}, error={}",
-                    messageId, seckillMessage.getRequestId(), e.getMessage(), e);
-
-            try {
-                // 更新 mq_message_log 状态 = FAILED
-                updateMessageLogFailed(messageId, e);
-
-                // 拒绝消息，重新入队
-                channel.basicNack(deliveryTag, false, true);
-            } catch (IOException ioException) {
-                log.error("消息拒绝失败: messageId={}", messageId, ioException);
+        } catch (BizException e) {
+            // 业务异常：标记事务回滚 + nack 消息重新入队
+            log.warn("秒杀订单处理业务异常: messageId={}, errorCode={}, errorMsg={}",
+                    messageId, e.getCode(), e.getMessage());
+            safeNack(channel, deliveryTag);
+            // 仅在"已参与"错误时保留成功状态（说明订单已在库中），其他情况写失败结果
+            if (e.getCode() != ErrorCode.ALREADY_PARTICIPATED.getCode()) {
+                writeSeckillResultFail(requestId, e.getMessage());
             }
-
-            // 写入秒杀失败结果到 Redis
-            writeSeckillResultFail(seckillMessage.getRequestId(), e.getMessage());
+            // 标记事务回滚（当前未捕获抛出，需手动标记）
+            org.springframework.transaction.interceptor.TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+        } catch (Exception e) {
+            // 系统异常：标记事务回滚 + nack 消息重新入队
+            log.error("秒杀订单处理系统异常: messageId={}, requestId={}, error={}",
+                    messageId, requestId, e.getMessage(), e);
+            safeNack(channel, deliveryTag);
+            writeSeckillResultFail(requestId, e.getMessage());
+            // 标记事务回滚
+            org.springframework.transaction.interceptor.TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
         }
     }
 
     /**
-     * 处理秒杀订单核心逻辑（事务）
+     * 检查秒杀订单是否已存在（业务幂等）
      */
-    @Transactional(rollbackFor = Exception.class)
-    public void processSeckillOrder(SeckillOrderMessage seckillMessage) {
-        Long userId = seckillMessage.getUserId();
-        Long activityId = seckillMessage.getActivityId();
-        Long skuId = seckillMessage.getSkuId();
-        String requestId = seckillMessage.getRequestId();
+    private boolean checkSeckillOrderExists(Long userId, Long activityId, Long skuId) {
+        Long count = seckillOrderMapper.selectCount(
+                new LambdaQueryWrapper<SeckillOrder>()
+                        .eq(SeckillOrder::getUserId, userId)
+                        .eq(SeckillOrder::getActivityId, activityId)
+                        .eq(SeckillOrder::getSkuId, skuId));
+        return count != null && count > 0;
+    }
 
-        // 检查 seckill_order 表唯一约束 (user_id, activity_id, sku_id) 防止重复下单
-        LambdaQueryWrapper<SeckillOrder> seckillQuery = new LambdaQueryWrapper<SeckillOrder>()
-                .eq(SeckillOrder::getUserId, userId)
-                .eq(SeckillOrder::getActivityId, activityId)
-                .eq(SeckillOrder::getSkuId, skuId);
-        Long count = seckillOrderMapper.selectCount(seckillQuery);
-        if (count != null && count > 0) {
-            throw new BizException(ErrorCode.ALREADY_PARTICIPATED);
+    /**
+     * 安全 nack（忽略 IO 异常）
+     */
+    private void safeNack(Channel channel, long deliveryTag) {
+        try {
+            channel.basicNack(deliveryTag, false, true);
+        } catch (IOException e) {
+            log.error("消息 nack 失败: deliveryTag={}", deliveryTag, e);
         }
-
-        // 调用库存服务扣减库存
-        InventoryDeductDTO deductDTO = new InventoryDeductDTO(skuId, seckillMessage.getQuantity(), requestId);
-        R<InventoryResponseDTO> deductResult = inventoryFeignClient.deductStock(deductDTO);
-
-        if (deductResult == null || deductResult.getCode() != 0 || deductResult.getData() == null
-                || !Boolean.TRUE.equals(deductResult.getData().getSuccess())) {
-            throw new BizException(ErrorCode.STOCK_DEDUCT_FAILED, "库存扣减失败");
-        }
-
-        // 创建订单
-        CreateOrderDTO createOrderDTO = new CreateOrderDTO();
-        createOrderDTO.setUserId(userId);
-        createOrderDTO.setSkuId(skuId);
-        createOrderDTO.setTitle("秒杀商品"); // 商品标题由秒杀服务预先设置
-        createOrderDTO.setPrice(seckillMessage.getSeckillPrice());
-        createOrderDTO.setQuantity(seckillMessage.getQuantity());
-        createOrderDTO.setActivityId(activityId);
-        createOrderDTO.setRequestId(requestId);
-        createOrderDTO.setOrderType("SECKILL");
-
-        Order order = orderService.createOrder(createOrderDTO);
-
-        // 写入 Redis seckill:result:{requestId} = 成功结果 JSON
-        writeSeckillResultSuccess(requestId, order.getId(), order.getOrderNo());
     }
 
     /**
      * 写入秒杀成功结果到 Redis
      */
     private void writeSeckillResultSuccess(String requestId, Long orderId, String orderNo) {
+        if (requestId == null || requestId.isEmpty()) {
+            return;
+        }
         try {
             String key = SECKILL_RESULT_PREFIX + requestId;
             String value = String.format(
-                    "{\"requestId\":\"%s\",\"resultStatus\":\"SUCCESS\",\"orderId\":%d,\"orderNo\":\"%s\",\"failureReason\":null}",
-                    requestId, orderId, orderNo);
+                    "{\"requestId\":\"%s\",\"resultStatus\":\"SUCCESS\",\"orderId\":%s,\"orderNo\":%s,\"failureReason\":null}",
+                    requestId,
+                    orderId != null ? orderId.toString() : "null",
+                    orderNo != null ? "\"" + orderNo + "\"" : "null");
             stringRedisTemplate.opsForValue().set(key, value, SECKILL_RESULT_TTL, TimeUnit.SECONDS);
             log.info("秒杀成功结果写入 Redis 成功: requestId={}", requestId);
         } catch (Exception e) {
@@ -201,26 +238,6 @@ public class SeckillOrderConsumer {
             log.info("秒杀失败结果写入 Redis 成功: requestId={}, reason={}", requestId, failureReason);
         } catch (Exception e) {
             log.error("秒杀失败结果写入 Redis 失败: requestId={}", requestId, e);
-        }
-    }
-
-    /**
-     * 更新消息日志状态为失败
-     */
-    private void updateMessageLogFailed(String messageId, Exception e) {
-        try {
-            LambdaQueryWrapper<MqMessageLog> queryWrapper = new LambdaQueryWrapper<MqMessageLog>()
-                    .eq(MqMessageLog::getMessageId, messageId)
-                    .eq(MqMessageLog::getConsumerGroup, RabbitConfig.CONSUMER_GROUP);
-            MqMessageLog messageLog = mqMessageLogMapper.selectOne(queryWrapper);
-            if (messageLog != null) {
-                messageLog.setStatus(STATUS_FAILED);
-                messageLog.setErrorMessage(e.getMessage());
-                messageLog.setUpdatedAt(LocalDateTime.now());
-                mqMessageLogMapper.updateById(messageLog);
-            }
-        } catch (Exception ex) {
-            log.error("更新消息日志失败状态异常: messageId={}", messageId, ex);
         }
     }
 }

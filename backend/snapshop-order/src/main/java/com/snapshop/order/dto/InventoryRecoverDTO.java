@@ -3,7 +3,7 @@ package com.snapshop.order.dto;
 import lombok.Data;
 
 /**
- * 库存回补请求 DTO（本地定义，与 inventory 模块 DTO 字段一致）
+ * 库存回补请求 DTO，字段对齐 snapshop-inventory 侧同名 DTO 以支持 Feign JSON 传参
  */
 @Data
 public class InventoryRecoverDTO {
@@ -19,6 +19,9 @@ public class InventoryRecoverDTO {
 
     /** 回补数量 */
     private Integer quantity;
+
+    /** 秒杀活动编号（用于 Redis 库存回补，非秒杀场景可为 null） */
+    private Long activityId;
 
     /** 回补原因 */
     private String reason;

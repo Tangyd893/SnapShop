@@ -58,8 +58,8 @@ public class SeckillServiceImpl implements SeckillService {
     private static final String STOCK_AVAILABLE = "有库存";
     private static final String STOCK_SOLD_OUT = "已售罄";
 
-    /** 消息状态常量 */
-    private static final String MSG_STATUS_PENDING = "待发送";
+    /** 消息状态常量（对齐 MessageCompensateTask 英文枚举） */
+    private static final String MSG_STATUS_PENDING = "PENDING_SEND";
 
     @Resource
     private SeckillActivityMapper seckillActivityMapper;

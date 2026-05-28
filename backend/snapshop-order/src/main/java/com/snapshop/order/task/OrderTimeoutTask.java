@@ -9,10 +9,11 @@ import com.snapshop.order.feign.InventoryFeignClient;
 import com.snapshop.order.mapper.OrderItemMapper;
 import com.snapshop.order.mapper.OrderMapper;
 import com.snapshop.order.mapper.OrderStatusLogMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,13 +26,27 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class OrderTimeoutTask {
 
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
     private final OrderStatusLogMapper orderStatusLogMapper;
     private final InventoryFeignClient inventoryFeignClient;
+
+    /** 自注入代理，用于突破自调用事务限制 */
+    private final OrderTimeoutTask self;
+
+    public OrderTimeoutTask(OrderMapper orderMapper,
+                            OrderItemMapper orderItemMapper,
+                            OrderStatusLogMapper orderStatusLogMapper,
+                            InventoryFeignClient inventoryFeignClient,
+                            @Lazy OrderTimeoutTask self) {
+        this.orderMapper = orderMapper;
+        this.orderItemMapper = orderItemMapper;
+        this.orderStatusLogMapper = orderStatusLogMapper;
+        this.inventoryFeignClient = inventoryFeignClient;
+        this.self = self;
+    }
 
     /** 订单状态：待支付 */
     private static final String STATUS_PENDING_PAY = "PENDING_PAY";
@@ -61,7 +76,8 @@ public class OrderTimeoutTask {
 
             for (Order order : timeoutOrders) {
                 try {
-                    closeOrder(order);
+                    // 通过代理调用以触发 @Transactional
+                    self.closeOrder(order);
                 } catch (Exception e) {
                     log.error("订单超时关闭失败: orderId={}, orderNo={}", order.getId(), order.getOrderNo(), e);
                 }
@@ -74,9 +90,13 @@ public class OrderTimeoutTask {
     }
 
     /**
-     * 关闭单个超时订单
+     * 关闭单个超时订单（独立事务）
+     * <p>
+     * 数据库操作在一个事务中完成；Feign 库存回补在外层 try-catch 兜底，
+     * 避免远程调用失败导致本地事务回滚。
      */
-    private void closeOrder(Order order) {
+    @Transactional(rollbackFor = Exception.class)
+    public void closeOrder(Order order) {
         log.info("关闭超时订单: orderId={}, orderNo={}", order.getId(), order.getOrderNo());
 
         // 1. 更新订单状态为已关闭
@@ -95,14 +115,13 @@ public class OrderTimeoutTask {
         statusLog.setCreatedAt(now);
         orderStatusLogMapper.insert(statusLog);
 
-        // 3. 回补库存
+        // 3. 回补库存（Feign 远程调用，失败不阻塞本地事务）
         List<OrderItem> orderItems = orderItemMapper.selectList(
                 new LambdaQueryWrapper<OrderItem>()
                         .eq(OrderItem::getOrderId, order.getId()));
 
         for (OrderItem item : orderItems) {
             try {
-                // 构造 InventoryRecoverDTO 调用库存回补接口
                 InventoryRecoverDTO recoverDTO = new InventoryRecoverDTO();
                 recoverDTO.setRequestId(UUID.randomUUID().toString());
                 recoverDTO.setBusinessKey(order.getOrderNo() + "_timeout_" + item.getSkuId());

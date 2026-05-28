@@ -224,6 +224,16 @@ UNIQUE KEY uk_user_activity_sku (user_id, activity_id, sku_id);
 
 如果事务失败，不确认消息。
 
+### 6.6 当前实现对齐
+
+当前订单服务秒杀消费实现遵循以下落地点：
+
+- `SeckillOrderConsumer.handleSeckillOrder` 作为事务入口，避免通过自调用触发事务导致代理失效。
+- 已成功处理的 `messageId + consumerGroup` 会直接确认消息，避免重复创建订单。
+- 如果 `seckill_order` 已存在同一 `userId + activityId + skuId`，消费者会按业务幂等直接确认消息，并补写秒杀成功结果。
+- 秒杀结果写入集中在 MQ 消费者，订单创建服务不再重复写 Redis。
+- 库存扣减请求携带 `requestId` 与 `businessKey`，便于库存服务按业务键做幂等。
+
 ## 七、失败重试设计
 
 ### 7.1 可重试异常
@@ -367,4 +377,3 @@ RabbitMQ 可靠消息设计完成后，应满足：
 - 同一用户同一活动商品不会重复下单。
 - 消息多次失败后可以进入死信队列。
 - 死信消息可以触发库存补偿或人工处理。
-

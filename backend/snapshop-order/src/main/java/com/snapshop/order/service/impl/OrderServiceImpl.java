@@ -10,7 +10,6 @@ import com.snapshop.order.mapper.*;
 import com.snapshop.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,7 +17,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 订单服务实现
@@ -32,7 +30,6 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemMapper orderItemMapper;
     private final SeckillOrderMapper seckillOrderMapper;
     private final OrderStatusLogMapper orderStatusLogMapper;
-    private final StringRedisTemplate stringRedisTemplate;
 
     /** 订单类型：普通订单 */
     private static final String ORDER_TYPE_NORMAL = "NORMAL";
@@ -42,10 +39,6 @@ public class OrderServiceImpl implements OrderService {
     private static final String STATUS_PENDING_PAY = "PENDING_PAY";
     /** 订单状态：已取消 */
     private static final String STATUS_CANCELLED = "CANCELLED";
-    /** Redis 秒杀结果键前缀 */
-    private static final String SECKILL_RESULT_PREFIX = "seckill:result:";
-    /** 秒杀结果 TTL（秒） */
-    private static final long SECKILL_RESULT_TTL = 86400L;
     /** 订单支付过期时间（分钟） */
     private static final int ORDER_EXPIRE_MINUTES = 15;
 
@@ -101,10 +94,7 @@ public class OrderServiceImpl implements OrderService {
         saveOrderStatusLog(order.getId(), orderNo, null, STATUS_PENDING_PAY,
                 dto.getOrderType() != null ? "创建" + dto.getOrderType() + "订单" : "创建订单");
 
-        // 秒杀结果写入 Redis（当 requestId 不为空时）
-        if (dto.getRequestId() != null && !dto.getRequestId().isEmpty()) {
-            writeSeckillResult(dto.getRequestId(), "成功", order.getId(), orderNo, null);
-        }
+        // 注意：秒杀结果写入 Redis 统一由 SeckillOrderConsumer 负责，此处不重复写入
 
         log.info("订单创建成功: orderId={}, orderNo={}", order.getId(), orderNo);
         return order;
@@ -170,24 +160,6 @@ public class OrderServiceImpl implements OrderService {
         String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         int randomNum = ThreadLocalRandom.current().nextInt(100000, 999999);
         return "SO" + dateStr + randomNum;
-    }
-
-    /**
-     * 写入秒杀结果到 Redis
-     */
-    private void writeSeckillResult(String requestId, String resultStatus,
-                                    Long orderId, String orderNo, String failureReason) {
-        try {
-            String key = SECKILL_RESULT_PREFIX + requestId;
-            String value = String.format(
-                    "{\"requestId\":\"%s\",\"resultStatus\":\"%s\",\"orderId\":%d,\"orderNo\":\"%s\",\"failureReason\":%s}",
-                    requestId, resultStatus, orderId, orderNo,
-                    failureReason != null ? "\"" + failureReason + "\"" : "null");
-            stringRedisTemplate.opsForValue().set(key, value, SECKILL_RESULT_TTL, TimeUnit.SECONDS);
-            log.info("秒杀结果写入 Redis 成功: requestId={}, result={}", requestId, resultStatus);
-        } catch (Exception e) {
-            log.error("秒杀结果写入 Redis 失败: requestId={}", requestId, e);
-        }
     }
 
     /**
