@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -21,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 验证超时订单能被关闭并回补库存
  */
 @SpringBootTest
+@ActiveProfiles("test")
 class OrderTimeoutTest {
 
     @Autowired
@@ -39,6 +41,14 @@ class OrderTimeoutTest {
 
     @BeforeEach
     void setUp() {
+        // 清理测试残留数据
+        seckillOrderMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SeckillOrder>()
+                .eq(SeckillOrder::getUserId, 10001L));
+        orderItemMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderItem>()
+                .eq(OrderItem::getSkuId, 30001L));
+        orderMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
+                .eq(Order::getUserId, 10001L));
+
         // 创建已过期的待支付订单
         Order order = new Order();
         order.setOrderNo("SO" + System.currentTimeMillis());

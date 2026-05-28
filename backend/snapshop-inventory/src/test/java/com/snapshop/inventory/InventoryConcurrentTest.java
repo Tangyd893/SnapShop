@@ -1,8 +1,10 @@
 package com.snapshop.inventory;
 
+import com.snapshop.inventory.config.TestRedisConfig;
 import com.snapshop.inventory.dto.InventoryDeductDTO;
 import com.snapshop.inventory.dto.InventoryResponseDTO;
 import com.snapshop.inventory.entity.StockRecord;
+import com.snapshop.inventory.mapper.InventoryLogMapper;
 import com.snapshop.inventory.mapper.SkuStockMapper;
 import com.snapshop.inventory.service.InventoryService;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,6 +12,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * 验证高并发场景下库存不会出现超卖
  */
 @SpringBootTest
+@ActiveProfiles("test")
+@Import(TestRedisConfig.class)
 class InventoryConcurrentTest {
 
     /** 测试用商品规格ID */
@@ -41,27 +47,24 @@ class InventoryConcurrentTest {
     @Autowired
     private SkuStockMapper skuStockMapper;
 
+    @Autowired
+    private InventoryLogMapper inventoryLogMapper;
+
     @BeforeEach
     void setUp() {
-        // 初始化测试库存数据：直接更新可用库存为初始值
-        StockRecord stock = skuStockMapper.selectById(TEST_SKU_ID);
-        if (stock == null) {
-            // 创建测试库存记录
-            stock = new StockRecord();
-            stock.setSkuId(TEST_SKU_ID);
-            stock.setAvailableStock(INITIAL_STOCK);
-            stock.setLockedStock(0);
-            stock.setSoldStock(0);
-            stock.setVersion(0);
-            skuStockMapper.insert(stock);
-        } else {
-            // 重置库存为初始值
-            stock.setAvailableStock(INITIAL_STOCK);
-            stock.setLockedStock(0);
-            stock.setSoldStock(0);
-            stock.setVersion(0);
-            skuStockMapper.updateById(stock);
-        }
+        // 清理测试残留数据（库存流水表）
+        inventoryLogMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.snapshop.inventory.entity.InventoryLog>()
+                .likeRight(com.snapshop.inventory.entity.InventoryLog::getBusinessKey, "CONCURRENT_TEST_BIZ_"));
+        // 清理并重置测试库存数据
+        skuStockMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<StockRecord>()
+                .eq(StockRecord::getSkuId, TEST_SKU_ID));
+        StockRecord stock = new StockRecord();
+        stock.setSkuId(TEST_SKU_ID);
+        stock.setAvailableStock(INITIAL_STOCK);
+        stock.setLockedStock(0);
+        stock.setSoldStock(0);
+        stock.setVersion(0);
+        skuStockMapper.insert(stock);
     }
 
     @Test
@@ -124,7 +127,9 @@ class InventoryConcurrentTest {
                 String.format("线程总数不匹配: success=%d + fail=%d != %d", actualSuccess, actualFail, THREAD_COUNT));
 
         // 验证数据库最终库存不为负数
-        StockRecord finalStock = skuStockMapper.selectById(TEST_SKU_ID);
+        StockRecord finalStock = skuStockMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<StockRecord>()
+                        .eq(StockRecord::getSkuId, TEST_SKU_ID));
         assertNotNull(finalStock, "最终库存记录不应为空");
         System.out.println("最终可用库存: " + finalStock.getAvailableStock());
         System.out.println("版本号: " + finalStock.getVersion());

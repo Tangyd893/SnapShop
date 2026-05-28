@@ -62,28 +62,39 @@ public class InventoryServiceImpl implements InventoryService {
             return InventoryResponseDTO.success();
         }
 
-        // 查询当前库存记录
-        StockRecord stock = getStock(dto.getSkuId());
-        int beforeStock = stock.getAvailableStock();
+        // 悲观锁 + 乐观锁重试，最多重试 5 次
+        int maxRetries = 5;
+        for (int retry = 0; retry < maxRetries; retry++) {
+            StockRecord stock = skuStockMapper.selectOne(
+                    new LambdaQueryWrapper<StockRecord>()
+                            .eq(StockRecord::getSkuId, dto.getSkuId())
+                            .last("FOR UPDATE"));
+            if (stock == null) {
+                throw new BizException(ErrorCode.NOT_FOUND, "库存记录不存在: skuId=" + dto.getSkuId());
+            }
+            int beforeStock = stock.getAvailableStock();
 
-        // 执行条件 UPDATE，乐观锁保证不超卖
-        int affected = skuStockMapper.deductStock(dto.getSkuId(), dto.getQuantity(), stock.getVersion());
-        if (affected == 0) {
-            log.warn("库存扣减失败（库存不足或版本冲突）: skuId={}, available={}, quantity={}, version={}",
-                    dto.getSkuId(), beforeStock, dto.getQuantity(), stock.getVersion());
-            return InventoryResponseDTO.fail("库存扣减失败");
+            if (beforeStock < dto.getQuantity()) {
+                log.warn("库存扣减失败（库存不足）: skuId={}, available={}, quantity={}",
+                        dto.getSkuId(), beforeStock, dto.getQuantity());
+                return InventoryResponseDTO.fail("库存扣减失败");
+            }
+
+            int affected = skuStockMapper.deductStock(dto.getSkuId(), dto.getQuantity(), stock.getVersion());
+            if (affected > 0) {
+                int afterStock = beforeStock - dto.getQuantity();
+                saveInventoryLog(dto.getBusinessKey(), dto.getSkuId(), CHANGE_TYPE_DEDUCT,
+                        dto.getQuantity(), beforeStock, afterStock, dto.getScene());
+                log.info("库存扣减成功: skuId={}, before={}, after={}, quantity={}, retry={}",
+                        dto.getSkuId(), beforeStock, afterStock, dto.getQuantity(), retry);
+                return InventoryResponseDTO.success();
+            }
+            log.warn("库存扣减版本冲突，重试 {}/{}: skuId={}, version={}",
+                    retry + 1, maxRetries, dto.getSkuId(), stock.getVersion());
         }
 
-        // 计算扣减后库存
-        int afterStock = beforeStock - dto.getQuantity();
-
-        // 写入库存流水
-        saveInventoryLog(dto.getBusinessKey(), dto.getSkuId(), CHANGE_TYPE_DEDUCT,
-                dto.getQuantity(), beforeStock, afterStock, dto.getScene());
-
-        log.info("库存扣减成功: skuId={}, before={}, after={}, quantity={}",
-                dto.getSkuId(), beforeStock, afterStock, dto.getQuantity());
-        return InventoryResponseDTO.success();
+        log.warn("库存扣减失败（超过最大重试次数）: skuId={}", dto.getSkuId());
+        return InventoryResponseDTO.fail("库存扣减失败");
     }
 
     @Override

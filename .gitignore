@@ -36,5 +36,8 @@ logs/
 Thumbs.db
 
 # Docker local data
-docker/data/
+docker/mysql/data/
+docker/nacos/data/
+docker/redis/data/
+docker/rabbitmq/data/
 

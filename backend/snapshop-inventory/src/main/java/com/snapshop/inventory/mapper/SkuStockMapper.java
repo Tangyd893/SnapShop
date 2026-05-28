@@ -39,4 +39,15 @@ public interface SkuStockMapper extends BaseMapper<StockRecord> {
             "WHERE sku_id = #{skuId} AND locked_stock >= #{quantity} AND version = #{version}")
     int recoverStock(@Param("skuId") Long skuId, @Param("quantity") Integer quantity,
                      @Param("version") Integer version);
+
+    /**
+     * 悲观锁查询库存记录（SELECT ... FOR UPDATE）
+     *
+     * @param skuId 商品规格编号
+     * @return 库存记录（带行锁）
+     */
+    @org.apache.ibatis.annotations.Select("SELECT id, sku_id, available_stock, locked_stock, " +
+            "sold_stock, version, created_at, updated_at " +
+            "FROM sku_stock WHERE sku_id = #{skuId} FOR UPDATE")
+    StockRecord selectForUpdate(@Param("skuId") Long skuId);
 }
