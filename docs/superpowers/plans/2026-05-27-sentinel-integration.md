@@ -8,6 +8,16 @@
 
 **Tech Stack:** Spring Cloud Alibaba 2023.0.1.0、Sentinel 1.8.x、Nacos 2.3.2、Spring Cloud Gateway
 
+**进度快照（2026-05-29 10:30）**
+
+| 任务 | 状态 | 说明 |
+| --- | --- | --- |
+| Task 1~2 | 已完成 | Sentinel Dashboard、5 份 Nacos 规则文件 |
+| Task 3~7 | 已完成 | 网关 Sentinel 依赖/配置/降级处理器；旧 RateLimitFilter 已删除 |
+| Task 8~10 | 已完成 | 秒杀服务 Sentinel 依赖/配置/注解支持 |
+| Task 11~12 | 已完成 | 订单/库存服务 Sentinel 依赖与配置已就绪 |
+| Task 13~16 | 部分完成 | 架构/README/可观测性文档已同步；订单/库存服务接入与启动指南待完成 |
+
 ---
 
 ## 文件结构

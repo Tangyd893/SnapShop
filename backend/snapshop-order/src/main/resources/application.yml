@@ -19,6 +19,21 @@ spring:
           enabled: true
           max-attempts: 3
           initial-interval: 2000ms
+  cloud:
+    sentinel:
+      transport:
+        dashboard: localhost:8888
+        port: 8719
+      eager: true
+      datasource:
+        degrade:
+          nacos:
+            server-addr: ${spring.cloud.nacos.server-addr}
+            namespace: ${spring.cloud.nacos.config.namespace}
+            dataId: sentinel-rules-snapshop-order-degrade.yaml
+            groupId: SENTINEL_GROUP
+            rule-type: degrade
+            data-type: json
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
