@@ -9,16 +9,63 @@ on:
 jobs:
   build-backend:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root123
+          MYSQL_DATABASE: snapshop
+          MYSQL_USER: snapshop
+          MYSQL_PASSWORD: snapshop123
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { java-version: '21', distribution: 'temurin' }
-      - run: cd backend && mvn -B compile
+      - name: 编译后端
+        run: cd backend && mvn -B compile
+      - name: 运行后端测试
+        run: cd backend && mvn -B test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/snapshop?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+          SPRING_DATASOURCE_USERNAME: snapshop
+          SPRING_DATASOURCE_PASSWORD: snapshop123
+          SPRING_REDIS_HOST: localhost
+          SPRING_REDIS_PORT: 6379
 
-  build-frontend:
+  build-frontend-web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: cd frontend/snapshop-web && npm ci && npm run build
+      - name: 安装 C 端依赖
+        run: cd frontend/snapshop-web && npm ci
+      - name: 构建 C 端
+        run: cd frontend/snapshop-web && npm run build
+
+  build-frontend-admin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: 安装管理端依赖
+        run: cd frontend/snapshop-admin && npm ci
+      - name: 构建管理端
+        run: cd frontend/snapshop-admin && npm run build

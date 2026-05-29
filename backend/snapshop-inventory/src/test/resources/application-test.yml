@@ -8,6 +8,10 @@ spring:
           enabled: false
       discovery:
         enabled: false
+    sentinel:
+      enabled: false
+    loadbalancer:
+      enabled: false
   datasource:
     url: jdbc:mysql://localhost:3306/snapshop?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: snapshop
